@@ -4,18 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
 const Login = () => {
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const formatPhoneNumber = (value) => {
-    // Remove all non-digit characters
     const digits = value.replace(/\D/g, '');
-    // Limit to 10 digits
-    const limited = digits.slice(0, 10);
-    return limited;
+    return digits.slice(0, 10);
   };
 
   const handleSubmit = async (e) => {
@@ -23,17 +20,26 @@ const Login = () => {
     setLoading(true);
 
     try {
-      if (!phoneNumber || phoneNumber.length !== 10) {
-        toast.error('Please enter a valid 10-digit phone number');
+      if (!identifier) {
+        toast.error('Please enter your email or phone number');
         setLoading(false);
         return;
+      }
+      // if it's a phone number, validate length
+      if (!identifier.includes('@')) {
+        const digits = identifier.replace(/\D/g, '');
+        if (digits.length !== 10) {
+          toast.error('Please enter a valid 10-digit phone number');
+          setLoading(false);
+          return;
+        }
       }
       if (!password) {
         toast.error('Please enter your password');
         setLoading(false);
         return;
       }
-      await login(phoneNumber, password);
+      await login(identifier, password);
       toast.success('Login successful!');
       navigate('/');
     } catch (error) {
@@ -56,22 +62,30 @@ const Login = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number
+              Email or Phone
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">+91</span>
               <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(formatPhoneNumber(e.target.value))}
+                type="text"
+                value={identifier}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // if user types digits only, keep a max of 10
+                  if (/^\d+$/.test(val)) {
+                    setIdentifier(formatPhoneNumber(val));
+                  } else {
+                    setIdentifier(val);
+                  }
+                }}
                 required
-                maxLength={10}
+                maxLength={80}
                 className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bet-red focus:border-transparent"
-                placeholder="Enter 10-digit phone number"
+                placeholder="Enter email or 10-digit phone number"
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Enter your 10-digit mobile number (e.g., 9876543210)
+              Enter your email or 10-digit mobile number (e.g., 9876543210)
             </p>
           </div>
 

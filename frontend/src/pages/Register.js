@@ -11,13 +11,7 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
 
-  // ------- PHONE OTP STATES -------
-  const [phoneOtp, setPhoneOtp] = useState("");
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
-  const [phoneOtpVerified, setPhoneOtpVerified] = useState(false);
-  const [sendingPhoneOTP, setSendingPhoneOTP] = useState(false);
-  const [verifyingPhoneOTP, setVerifyingPhoneOTP] = useState(false);
-  const [mockPhoneOTP, setMockPhoneOTP] = useState("");
+  // Email (no OTP required)
 
   const [loading, setLoading] = useState(false);
 
@@ -27,58 +21,9 @@ const Register = () => {
   // Format phone number
   const formatPhoneNumber = (value) => value.replace(/\D/g, "").slice(0, 10);
 
-  // -------------------------------
-  // SEND PHONE OTP
-  // -------------------------------
-  const handleSendPhoneOTP = async () => {
-    if (!phoneNumber || phoneNumber.length !== 10) {
-      toast.error("Enter valid 10-digit phone number");
-      return;
-    }
+  // No email OTP required for registration
 
-    setSendingPhoneOTP(true);
-    try {
-      const res = await api.post("/auth/send-otp", { phoneNumber });
-
-      setPhoneOtpSent(true);
-      toast.success("Phone OTP sent!");
-
-      if (res.data.mockOTP) {
-        setMockPhoneOTP(res.data.mockOTP);
-        toast.info(`Mock Phone OTP: ${res.data.mockOTP}`);
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to send phone OTP");
-    } finally {
-      setSendingPhoneOTP(false);
-    }
-  };
-
-  // -------------------------------
-  // VERIFY PHONE OTP
-  // -------------------------------
-  const handleVerifyPhoneOTP = async () => {
-    if (!phoneOtp) {
-      toast.error("Enter phone OTP");
-      return;
-    }
-
-    setVerifyingPhoneOTP(true);
-
-    try {
-      await api.post("/auth/verify-otp", { phoneNumber, otp: phoneOtp });
-      setPhoneOtpVerified(true);
-      toast.success("Phone number verified!");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Invalid phone OTP");
-    } finally {
-      setVerifyingPhoneOTP(false);
-    }
-  };
-
-  // -------------------------------
   // REGISTER
-  // -------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -92,12 +37,6 @@ const Register = () => {
 
       if (!email.includes("@")) {
         toast.error("Enter valid email");
-        setLoading(false);
-        return;
-      }
-
-      if (!phoneOtpVerified) {
-        toast.error("Verify your phone number first!");
         setLoading(false);
         return;
       }
@@ -132,11 +71,9 @@ const Register = () => {
             />
           </div>
 
-          {/* EMAIL (Required, No OTP) */}
+          {/* EMAIL + OTP */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Email Address
-            </label>
+            <label className="block text-sm font-medium mb-1">Email Address</label>
             <input
               className="w-full px-4 py-3 border rounded-lg"
               type="email"
@@ -146,7 +83,7 @@ const Register = () => {
             />
           </div>
 
-          {/* PHONE + OTP */}
+          {/* PHONE */}
           <div>
             <label className="block text-sm font-medium mb-1">
               Phone Number
@@ -160,56 +97,10 @@ const Register = () => {
                 onChange={(e) => {
                   const formatted = formatPhoneNumber(e.target.value);
                   setPhoneNumber(formatted);
-                  setPhoneOtpSent(false);
-                  setPhoneOtpVerified(false);
                 }}
                 placeholder="10-digit mobile"
               />
-
-              <button
-                type="button"
-                className="px-4 py-3 bg-blue-500 text-white rounded-lg"
-                onClick={handleSendPhoneOTP}
-                disabled={
-                  sendingPhoneOTP ||
-                  phoneOtpVerified ||
-                  phoneNumber.length !== 10
-                }
-              >
-                {sendingPhoneOTP
-                  ? "Sending..."
-                  : phoneOtpSent
-                  ? "Resend"
-                  : "Send OTP"}
-              </button>
             </div>
-
-            {/* Phone OTP input */}
-            {phoneOtpSent && !phoneOtpVerified && (
-              <div className="mt-3 flex gap-2">
-                <input
-                  className="flex-1 px-4 py-3 border rounded-lg"
-                  maxLength={6}
-                  value={phoneOtp}
-                  onChange={(e) =>
-                    setPhoneOtp(e.target.value.replace(/\D/g, ""))
-                  }
-                  placeholder="Enter Phone OTP"
-                />
-                <button
-                  type="button"
-                  className="px-4 py-3 bg-green-600 text-white rounded-lg"
-                  onClick={handleVerifyPhoneOTP}
-                  disabled={verifyingPhoneOTP}
-                >
-                  {verifyingPhoneOTP ? "Checking..." : "Verify"}
-                </button>
-              </div>
-            )}
-
-            {phoneOtpVerified && (
-              <p className="text-green-600 text-sm mt-1">Phone Verified ✔</p>
-            )}
           </div>
 
           {/* PASSWORD */}
@@ -241,7 +132,7 @@ const Register = () => {
           {/* SUBMIT */}
           <button
             className="w-full py-3 bg-bet-red text-white rounded-lg"
-            disabled={loading || !phoneOtpVerified}
+            disabled={loading}
           >
             {loading ? "Registering..." : "Complete Registration"}
           </button>

@@ -22,19 +22,23 @@ const resetPassword = async () => {
       process.exit(1);
     }
 
-    // Reset password
-    user.password = newPassword;
-    await user.save();
+    // Hash new password and update directly to avoid triggering full-document validation
+    const hashed = await bcrypt.hash(newPassword, 10);
+    const updatedUser = await User.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      { password: hashed },
+      { new: true }
+    );
 
     // Verify password works
-    const isMatch = await user.comparePassword(newPassword);
-    
+    const isMatch = await updatedUser.comparePassword(newPassword);
+
     console.log("Password reset successful!");
     console.log({
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      passwordVerified: isMatch
+      email: updatedUser.email,
+      name: updatedUser.name,
+      role: updatedUser.role,
+      passwordVerified: isMatch,
     });
 
     process.exit(0);
@@ -45,6 +49,7 @@ const resetPassword = async () => {
 };
 
 resetPassword();
+
 
 
 

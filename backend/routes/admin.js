@@ -6,6 +6,7 @@ const User = require("../models/User");
 const Game = require("../models/Game");
 const Bet = require("../models/Bet");
 const Withdrawal = require("../models/Withdrawal");
+const { initiateWithdrawal, getPayoutStatus, isConfigured: isRazorpayConfigured } = require("../utils/razorpayService");
 
 // Get all pending withdrawals
 router.get("/withdrawals", auth, adminAuth, async (req, res) => {
@@ -49,43 +50,90 @@ router.post("/approve-withdrawal/:id", auth, adminAuth, async (req, res) => {
       return res.status(400).json({ message: "Withdrawal already processed" });
     }
 
-    // Update withdrawal status
-    withdrawal.status = "completed";
+    withdrawal.status = "processing";
     withdrawal.processedAt = new Date();
     withdrawal.processedBy = req.user._id;
     if (adminNotes) {
       withdrawal.adminNotes = adminNotes;
     }
+
+    // Check if Razorpay is configured
+    if (isRazorpayConfigured()) {
+      console.log(`📤 Processing withdrawal ${withdrawal._id} via Razorpay...`);
+
+      // Prepare payout data
+      const payoutData = {
+        amount: Math.round(withdrawal.amount * 100), // Convert to paise
+        method: withdrawal.withdrawalMethod,
+        description: `Withdrawal to ${withdrawal.withdrawalMethod} account`,
+        reference_id: withdrawal._id.toString(),
+      };
+
+      if (withdrawal.withdrawalMethod === "bank") {
+        payoutData.account_number = withdrawal.accountNumber;
+        payoutData.ifsc_code = withdrawal.ifscCode;
+        payoutData.account_holder_name = withdrawal.accountHolderName;
+      } else if (withdrawal.withdrawalMethod === "upi") {
+        payoutData.account_number = withdrawal.upiId;
+      } else if (withdrawal.withdrawalMethod === "wallet") {
+        // Note: Razorpay Payouts API doesn't directly support wallet transfers
+        // This would need to be handled via a separate wallet integration
+        return res.status(400).json({
+          message: "Wallet transfers via Razorpay are not yet supported. Please use bank or UPI.",
+        });
+      }
+
+      // Initiate payout via Razorpay
+      const payoutResult = await initiateWithdrawal(payoutData);
+
+      if (payoutResult.success) {
+        withdrawal.razorpayPayoutId = payoutResult.payoutId;
+        withdrawal.payoutStatus = payoutResult.status;
+        console.log(`✅ Razorpay payout initiated: ${payoutResult.payoutId}`);
+      } else {
+        // Payout failed - revert wallet balance
+        await User.findByIdAndUpdate(withdrawal.user._id, {
+          $inc: { walletBalance: withdrawal.amount },
+        });
+        withdrawal.status = "rejected";
+        withdrawal.payoutFailureReason = payoutResult.error || "Payout initiation failed";
+        console.error(`❌ Payout failed: ${payoutResult.error}`);
+      }
+    } else {
+      console.warn("⚠️ Razorpay not configured. Marking withdrawal as pending manual processing.");
+      withdrawal.payoutStatus = "pending";
+    }
+
     await withdrawal.save();
 
     // Update transaction status
     const transaction = withdrawal.transaction;
     if (transaction) {
-      transaction.status = "completed";
+      transaction.status = withdrawal.status === "rejected" ? "cancelled" : "processing";
       await transaction.save();
     }
 
-    // Update user statistics
-    const user = await User.findById(withdrawal.user._id);
-    user.totalWithdrawals += withdrawal.amount;
-    await user.save();
+    // Note: User statistics (totalWithdrawals) is updated only when payout is completed
+    // For now, the amount was already deducted from wallet when withdrawal was requested
 
-    // Note: The amount was already deducted from wallet when withdrawal was requested
-    // When approved, the user receives the amount in their account based on withdrawal details
-    // Admin should process the actual transfer using the withdrawal details provided
+    const updatedWithdrawal = await Withdrawal.findById(withdrawal._id)
+      .populate("user", "name email")
+      .populate("transaction", "amount status description")
+      .populate("processedBy", "name email");
 
-    // Note: In a real application, you would integrate with a payment gateway
-    // (like Stripe Connect, RazorpayX, or bank API) to transfer funds here
-    // For now, we mark it as completed and the admin should process it manually
-    // The withdrawal details are available in withdrawal object for manual processing
+    if (withdrawal.status === "rejected") {
+      return res.status(400).json({
+        message: "Withdrawal rejected. Funds have been refunded to user wallet.",
+        withdrawal: updatedWithdrawal,
+      });
+    }
 
     res.json({
-      message:
-        "Withdrawal approved successfully. Amount should be transferred to user's account.",
-      withdrawal: await Withdrawal.findById(withdrawal._id)
-        .populate("user", "name email")
-        .populate("transaction", "amount status description")
-        .populate("processedBy", "name email"),
+      message: isRazorpayConfigured()
+        ? "Withdrawal approved and payout initiated via Razorpay. Status will update automatically."
+        : "Withdrawal marked for manual processing.",
+      withdrawal: updatedWithdrawal,
+      razorpayEnabled: isRazorpayConfigured(),
     });
   } catch (error) {
     console.error("Approve withdrawal error:", error);
@@ -125,10 +173,8 @@ router.post("/reject-withdrawal/:id", auth, adminAuth, async (req, res) => {
       await transaction.save();
     }
 
-    // Refund amount to user
-    const user = await User.findById(withdrawal.user._id);
-    user.walletBalance += withdrawal.amount;
-    await user.save();
+    // Refund amount to user (atomic)
+    await User.findByIdAndUpdate(withdrawal.user._id, { $inc: { walletBalance: withdrawal.amount } });
 
     // Populate the updated withdrawal
     const updatedWithdrawal = await Withdrawal.findById(withdrawal._id)
@@ -197,6 +243,63 @@ router.get("/withdrawals/all", auth, adminAuth, async (req, res) => {
     res.json({ withdrawals });
   } catch (error) {
     console.error("Get all withdrawals error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Check Razorpay payout status
+router.get("/withdrawal/:id/payout-status", auth, adminAuth, async (req, res) => {
+  try {
+    const withdrawal = await Withdrawal.findById(req.params.id);
+
+    if (!withdrawal) {
+      return res.status(404).json({ message: "Withdrawal not found" });
+    }
+
+    if (!withdrawal.razorpayPayoutId) {
+      return res.status(400).json({
+        message: "No Razorpay payout associated with this withdrawal",
+      });
+    }
+
+    // Fetch latest status from Razorpay
+    const payoutStatus = await getPayoutStatus(withdrawal.razorpayPayoutId);
+
+    if (payoutStatus.success) {
+      // Update withdrawal if status has changed
+      if (payoutStatus.status !== withdrawal.payoutStatus) {
+        withdrawal.payoutStatus = payoutStatus.status;
+
+        // If payout is completed, update user statistics
+        if (payoutStatus.status === "completed") {
+          withdrawal.status = "completed";
+          await User.findByIdAndUpdate(withdrawal.user, {
+            $inc: { totalWithdrawals: withdrawal.amount },
+          });
+        }
+
+        await withdrawal.save();
+      }
+
+      return res.json({
+        message: "Payout status retrieved",
+        withdrawal: {
+          id: withdrawal._id,
+          amount: withdrawal.amount,
+          status: withdrawal.status,
+          payoutStatus: payoutStatus.status,
+          razorpayPayoutId: withdrawal.razorpayPayoutId,
+          failureReason: payoutStatus.failureReason,
+        },
+      });
+    } else {
+      return res.status(500).json({
+        message: "Failed to fetch payout status",
+        error: payoutStatus.error,
+      });
+    }
+  } catch (error) {
+    console.error("Check payout status error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });

@@ -111,11 +111,12 @@ router.post("/confirm-deposit", auth, async (req, res) => {
         : paymentIntent.payment_method?.id || paymentIntentId;
     await transaction.save();
 
-    // Update user wallet
-    const user = await User.findById(req.user._id);
-    user.walletBalance += transaction.amount;
-    user.totalDeposits += transaction.amount;
-    await user.save();
+    // Update user wallet using atomic update to avoid triggering document validation
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $inc: { walletBalance: transaction.amount, totalDeposits: transaction.amount } },
+      { new: true }
+    );
 
     res.json({
       message: "Deposit successful",
@@ -180,17 +181,19 @@ router.post("/withdraw", auth, async (req, res) => {
       }
     }
 
-    const user = await User.findById(req.user._id);
-    if (user.walletBalance < amount) {
+    // Atomically deduct from wallet if sufficient balance
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.user._id, walletBalance: { $gte: amount } },
+      { $inc: { walletBalance: -amount } },
+      { new: true }
+    );
+
+    if (!updatedUser) {
       return res.status(400).json({ message: "Insufficient balance" });
     }
 
     // Calculate minimum bet amount required (10% of withdrawal amount, minimum ₹100)
     const minBetAmount = Math.max(100, Math.ceil(amount * 0.1));
-
-    // Deduct from wallet (will be refunded if rejected)
-    user.walletBalance -= amount;
-    await user.save();
 
     // Create withdrawal transaction with details
     const transaction = await Transaction.create({

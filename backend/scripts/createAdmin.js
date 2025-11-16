@@ -15,8 +15,7 @@ const createAdmin = async () => {
     const user = await User.findOne({ email });
 
     if (user) {
-      user.role = "admin";
-      await user.save();
+      await User.findOneAndUpdate({ email }, { role: "admin" });
       console.log(`User ${email} is now an admin`);
     } else {
       console.log(`User with email ${email} not found. Please register first.`);

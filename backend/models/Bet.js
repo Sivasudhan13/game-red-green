@@ -44,3 +44,4 @@ const betSchema = new mongoose.Schema(
 module.exports = mongoose.model("Bet", betSchema);
 
 
+

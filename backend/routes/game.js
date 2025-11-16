@@ -118,8 +118,14 @@ router.post("/bet", auth, async (req, res) => {
       return res.status(400).json({ message: "Invalid bet amount" });
     }
 
-    const user = await User.findById(req.user._id);
-    if (user.walletBalance < amount) {
+    // Atomically deduct amount from user's wallet if sufficient balance
+    const user = await User.findOneAndUpdate(
+      { _id: req.user._id, walletBalance: { $gte: amount } },
+      { $inc: { walletBalance: -amount } },
+      { new: true }
+    );
+
+    if (!user) {
       return res.status(400).json({ message: "Insufficient balance" });
     }
 
@@ -147,9 +153,7 @@ router.post("/bet", auth, async (req, res) => {
         .json({ message: "You have already placed a bet in this game" });
     }
 
-    // Deduct amount from wallet
-    user.walletBalance -= amount;
-    await user.save();
+    // Wallet already deducted atomically above
 
     // Create bet
     const bet = new Bet({
@@ -320,8 +324,12 @@ router.post("/process-result", auth, async (req, res) => {
       if (bet.color === winningColor) {
         // User wins - double the amount
         const winAmount = bet.amount * 2;
-        user.walletBalance += winAmount;
-        user.totalWinnings += winAmount;
+
+        // Atomically credit user's wallet and total winnings
+        await User.findByIdAndUpdate(user._id, {
+          $inc: { walletBalance: winAmount, totalWinnings: winAmount },
+        });
+
         bet.status = "won";
         bet.winAmount = winAmount;
         bet.payout = winAmount;
@@ -341,7 +349,6 @@ router.post("/process-result", auth, async (req, res) => {
       }
 
       await bet.save();
-      await user.save();
     }
 
     // Calculate admin commission (1-10rs based on total bet amount)

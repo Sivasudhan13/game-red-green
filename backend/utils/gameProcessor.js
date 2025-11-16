@@ -73,19 +73,21 @@ const processGameResult = async () => {
     const bets = await Bet.find({ game: game._id, status: "pending" });
 
     for (const bet of bets) {
-      const user = await User.findById(bet.user);
-
       if (bet.color === winningColor) {
         // User wins - double the amount
         const winAmount = bet.amount * 2;
-        user.walletBalance += winAmount;
-        user.totalWinnings += winAmount;
+
+        // Atomically credit user's wallet and total winnings
+        await User.findByIdAndUpdate(bet.user, {
+          $inc: { walletBalance: winAmount, totalWinnings: winAmount },
+        });
+
         bet.status = "won";
         bet.winAmount = winAmount;
         bet.payout = winAmount;
 
         await Transaction.create({
-          user: user._id,
+          user: bet.user,
           type: "win",
           amount: winAmount,
           status: "completed",
@@ -99,7 +101,6 @@ const processGameResult = async () => {
       }
 
       await bet.save();
-      await user.save();
     }
 
     // Update commission for pending withdrawals based on bets

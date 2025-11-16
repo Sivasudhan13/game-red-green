@@ -40,6 +40,7 @@ app.use("/api/game", require("./routes/game"));
 app.use("/api/payment", require("./routes/payment"));
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/email", require("./routes/email"));
+app.use("/api/webhooks", require("./routes/webhooks"));
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

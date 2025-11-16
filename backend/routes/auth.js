@@ -165,16 +165,141 @@ router.post("/verify-otp", async (req, res) => {
   }
 });
 
-// Register (requires OTP verification)
-router.post("/register", async (req, res) => {
+// Send OTP for email verification
+router.post("/send-email-otp", async (req, res) => {
   try {
-    const { name, phoneNumber, password, inviteCode } = req.body;
+    const { email } = req.body;
 
-    // Validate input
-    if (!name || !phoneNumber || !password) {
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Please enter a valid email address" });
+    }
+
+    // Check if email is already registered
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    // Generate OTP
+    const otpCode = generateOTP();
+
+    // Delete any existing OTPs for this email
+    await OTP.deleteMany({ email: email.toLowerCase() });
+
+    // Create new OTP
+    const otp = new OTP({
+      email: email.toLowerCase(),
+      otp: otpCode,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    });
+    await otp.save();
+
+    // Send OTP via email
+    try {
+      await sendOTPEmail(email, otpCode);
+
+      res.json({
+        message: "OTP sent successfully to your email",
+        email: email.toLowerCase(),
+      });
+    } catch (emailError) {
+      console.error("❌ Email sending failed:", emailError.message);
+
+      // In development, return mock OTP even if email fails
+      if (
+        process.env.NODE_ENV === "development" ||
+        process.env.NODE_ENV !== "production"
+      ) {
+        return res.json({
+          message: "OTP generated (Email service unavailable - check console)",
+          mockOTP: otpCode,
+          email: email.toLowerCase(),
+        });
+      }
+
+      res.status(500).json({
+        message: "Failed to send OTP email. Please check your email configuration.",
+        error: emailError.message,
+      });
+    }
+  } catch (error) {
+    console.error("Send email OTP error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Verify email OTP
+router.post("/verify-email-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
       return res
         .status(400)
-        .json({ message: "Name, phone number, and password are required" });
+        .json({ message: "Email and OTP are required" });
+    }
+
+    // Find OTP
+    const otpRecord = await OTP.findOne({
+      email: email.toLowerCase(),
+      verified: false,
+    }).sort({ createdAt: -1 });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "OTP not found or already used" });
+    }
+
+    // Check if OTP is expired
+    if (otpRecord.expiresAt < new Date()) {
+      return res
+        .status(400)
+        .json({ message: "OTP has expired. Please request a new one." });
+    }
+
+    // Check attempts
+    if (otpRecord.attempts >= 5) {
+      return res
+        .status(400)
+        .json({
+          message: "Too many failed attempts. Please request a new OTP.",
+        });
+    }
+
+    // Verify OTP
+    if (otpRecord.otp !== otp) {
+      await otpRecord.incrementAttempts();
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    // Mark OTP as verified
+    await otpRecord.markAsVerified();
+
+    res.json({
+      message: "Email OTP verified successfully",
+      verified: true,
+    });
+  } catch (error) {
+    console.error("Verify email OTP error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Register
+router.post("/register", async (req, res) => {
+  try {
+    const { name, phoneNumber, password, inviteCode, email } = req.body;
+
+    // Validate input
+    if (!name || !phoneNumber || !password || !email) {
+      return res
+        .status(400)
+        .json({ message: "Name, phone number, email, and password are required" });
     }
 
     if (password.length < 6) {
@@ -193,7 +318,7 @@ router.post("/register", async (req, res) => {
         .json({ message: "Please enter a valid 10-digit phone number" });
     }
 
-    // Check if user exists
+    // Check if user exists with phone number
     const existingUser = await User.findOne({ phoneNumber: normalizedPhone });
     if (existingUser) {
       return res
@@ -201,27 +326,17 @@ router.post("/register", async (req, res) => {
         .json({ message: "User already exists with this phone number" });
     }
 
-    // Check if phone number was verified with OTP
-    const otpRecord = await OTP.findOne({
-      phoneNumber: normalizedPhone,
-      verified: true,
-    }).sort({ updatedAt: -1 });
-
-    if (!otpRecord) {
-      return res.status(400).json({
-        message:
-          "Phone number not verified. Please verify your phone number with OTP first.",
-      });
+    // Check if email is already used
+    if (email) {
+      const existingEmail = await User.findOne({ email: email.toLowerCase() });
+      if (existingEmail) {
+        return res
+          .status(400)
+          .json({ message: "Email already registered" });
+      }
     }
 
-    // Check if OTP was verified recently (within last 30 minutes)
-    const otpAge = Date.now() - otpRecord.updatedAt.getTime();
-    if (otpAge > 30 * 60 * 1000) {
-      return res.status(400).json({
-        message:
-          "OTP verification expired. Please verify your phone number again.",
-      });
-    }
+    // Note: email OTP verification not required for registration
 
     // Generate unique invite code
     let userInviteCode = generateInviteCode();
@@ -240,10 +355,11 @@ router.post("/register", async (req, res) => {
       }
     }
 
-    // Create user with phone number
+    // Create user with phone number and email
     const user = new User({
       name: name.trim(),
       phoneNumber: normalizedPhone,
+      email: email ? email.toLowerCase() : null,
       password,
       inviteCode: userInviteCode,
       referredBy,
@@ -253,9 +369,8 @@ router.post("/register", async (req, res) => {
 
     // If referred, add 25rs to referrer
     if (referredBy) {
-      const referrer = await User.findById(referredBy);
-      referrer.walletBalance += 25;
-      await referrer.save();
+      // Atomically credit referrer's wallet to avoid document validation issues
+      await User.findByIdAndUpdate(referredBy, { $inc: { walletBalance: 25 } });
 
       // Create referral transaction
       await Transaction.create({
@@ -295,19 +410,28 @@ router.post("/register", async (req, res) => {
 // Login
 router.post("/login", async (req, res) => {
   try {
-    const { phoneNumber, password } = req.body;
+    const { identifier, password, phoneNumber, email } = req.body;
 
-    if (!phoneNumber || !password) {
-      return res
-        .status(400)
-        .json({ message: "Phone number and password are required" });
+    // Allow callers to send either `identifier` (email or phone), or `phoneNumber`/`email` explicitly
+    let lookup = {};
+    if (identifier) {
+      if (typeof identifier === 'string' && identifier.includes('@')) {
+        lookup.email = identifier.toLowerCase();
+      } else {
+        lookup.phoneNumber = normalizePhoneNumber(identifier);
+      }
+    } else if (email) {
+      lookup.email = email.toLowerCase();
+    } else if (phoneNumber) {
+      lookup.phoneNumber = normalizePhoneNumber(phoneNumber);
     }
 
-    // Normalize phone number
-    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if ((!lookup.email && !lookup.phoneNumber) || !password) {
+      return res.status(400).json({ message: "Identifier (email or phone) and password are required" });
+    }
 
-    // Find user by phone number
-    const user = await User.findOne({ phoneNumber: normalizedPhone });
+    // Find user by email or phone
+    const user = await User.findOne(lookup);
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }

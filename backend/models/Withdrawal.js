@@ -99,6 +99,20 @@ const withdrawalSchema = new mongoose.Schema(
       enum: ["pending", "completed"],
       default: "pending",
     },
+    // Razorpay payout tracking
+    razorpayPayoutId: {
+      type: String,
+      default: null,
+    },
+    payoutStatus: {
+      type: String,
+      enum: ["pending", "processing", "queued", "rejected", "failed", "reversed", "completed"],
+      default: "pending",
+    },
+    payoutFailureReason: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,

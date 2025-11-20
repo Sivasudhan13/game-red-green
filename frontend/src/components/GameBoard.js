@@ -1,20 +1,27 @@
-import React from 'react';
+import React from "react";
 
-const GameBoard = ({ game, timeRemaining, formatTime, onColorClick, user, databaseConnected = true }) => {
+const GameBoard = ({
+  game,
+  timeRemaining,
+  formatTime,
+  onColorClick,
+  user,
+  databaseConnected = true,
+}) => {
   const getNumberColor = (num) => {
     const colorMap = {
-      0: 'bg-gradient-to-r from-purple-500 to-red-500',
-      1: 'bg-bet-green',
-      2: 'bg-bet-red',
-      3: 'bg-bet-green',
-      4: 'bg-bet-red',
-      5: 'bg-gradient-to-r from-purple-500 to-green-500',
-      6: 'bg-bet-red',
-      7: 'bg-bet-green',
-      8: 'bg-bet-red',
-      9: 'bg-bet-green',
+      0: "bg-gradient-to-r from-purple-500 to-red-500",
+      1: "bg-bet-green",
+      2: "bg-bet-red",
+      3: "bg-bet-green",
+      4: "bg-bet-red",
+      5: "bg-gradient-to-r from-purple-500 to-green-500",
+      6: "bg-bet-red",
+      7: "bg-bet-green",
+      8: "bg-bet-red",
+      9: "bg-bet-green",
     };
-    return colorMap[num] || 'bg-gray-500';
+    return colorMap[num] || "bg-gray-500";
   };
 
   return (
@@ -25,27 +32,37 @@ const GameBoard = ({ game, timeRemaining, formatTime, onColorClick, user, databa
           <h2 className="text-2xl font-bold text-gray-800">WinGo 1 Min</h2>
           <div className="text-right">
             <p className="text-sm text-gray-600">Time Remaining</p>
-            <p className="text-3xl font-bold text-bet-red">{formatTime(timeRemaining)}</p>
+            <p className="text-3xl font-bold text-bet-red">
+              {formatTime(timeRemaining)}
+            </p>
           </div>
         </div>
         <p className="text-sm text-gray-500 mb-2">Game ID: {game.gameId}</p>
-        
+
         {/* Recent Results */}
         {game.winningColor && (
           <div className="flex items-center gap-2 mb-4">
             <span className="text-sm text-gray-600">Last Result:</span>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-              game.winningColor === 'red' ? 'bg-bet-red' :
-              game.winningColor === 'green' ? 'bg-bet-green' :
-              'bg-bet-violet'
-            }`}>
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                game.winningColor === "red"
+                  ? "bg-bet-red"
+                  : game.winningColor === "green"
+                  ? "bg-bet-green"
+                  : "bg-bet-violet"
+              }`}
+            >
               {game.winningNumber}
             </div>
-            <span className={`text-sm font-semibold ${
-              game.winningColor === 'red' ? 'text-bet-red' :
-              game.winningColor === 'green' ? 'text-bet-green' :
-              'text-bet-violet'
-            }`}>
+            <span
+              className={`text-sm font-semibold ${
+                game.winningColor === "red"
+                  ? "text-bet-red"
+                  : game.winningColor === "green"
+                  ? "text-bet-green"
+                  : "text-bet-violet"
+              }`}
+            >
               {game.winningColor.toUpperCase()}
             </span>
           </div>
@@ -55,34 +72,40 @@ const GameBoard = ({ game, timeRemaining, formatTime, onColorClick, user, databa
       {/* Color Betting Buttons */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <button
-          onClick={() => onColorClick('green')}
+          onClick={() => onColorClick("green")}
           disabled={!user || timeRemaining < 30 || !databaseConnected}
           className="bg-bet-green text-white py-6 rounded-lg font-bold text-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"
         >
           Green
-          <div className="text-sm mt-1 opacity-90">
-            {game.totalBets?.green || 0} bets
-          </div>
+          {user?.role === "admin" && (
+            <div className="text-sm mt-1 opacity-90">
+              {game.totalBets?.green || 0} bets
+            </div>
+          )}
         </button>
         <button
-          onClick={() => onColorClick('violet')}
+          onClick={() => onColorClick("violet")}
           disabled={!user || timeRemaining < 30 || !databaseConnected}
           className="bg-bet-violet text-white py-6 rounded-lg font-bold text-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"
         >
           Violet
-          <div className="text-sm mt-1 opacity-90">
-            {game.totalBets?.violet || 0} bets
-          </div>
+          {user?.role === "admin" && (
+            <div className="text-sm mt-1 opacity-90">
+              {game.totalBets?.violet || 0} bets
+            </div>
+          )}
         </button>
         <button
-          onClick={() => onColorClick('red')}
+          onClick={() => onColorClick("red")}
           disabled={!user || timeRemaining < 30 || !databaseConnected}
           className="bg-bet-red text-white py-6 rounded-lg font-bold text-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg"
         >
           Red
-          <div className="text-sm mt-1 opacity-90">
-            {game.totalBets?.red || 0} bets
-          </div>
+          {user?.role === "admin" && (
+            <div className="text-sm mt-1 opacity-90">
+              {game.totalBets?.red || 0} bets
+            </div>
+          )}
         </button>
       </div>
 
@@ -91,7 +114,9 @@ const GameBoard = ({ game, timeRemaining, formatTime, onColorClick, user, databa
         {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
           <div
             key={num}
-            className={`${getNumberColor(num)} w-full aspect-square rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md`}
+            className={`${getNumberColor(
+              num
+            )} w-full aspect-square rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md`}
           >
             {num}
           </div>
@@ -101,7 +126,8 @@ const GameBoard = ({ game, timeRemaining, formatTime, onColorClick, user, databa
       {!databaseConnected && (
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-sm text-red-800 text-center">
-            ⚠️ Database disconnected. Betting is disabled. Please check your MongoDB connection.
+            ⚠️ Database disconnected. Betting is disabled. Please check your
+            MongoDB connection.
           </p>
         </div>
       )}
@@ -126,5 +152,3 @@ const GameBoard = ({ game, timeRemaining, formatTime, onColorClick, user, databa
 };
 
 export default GameBoard;
-
-

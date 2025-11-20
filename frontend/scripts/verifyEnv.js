@@ -36,12 +36,6 @@ const requiredVars = [
     description: "Backend API URL",
     validator: (val) => val && (val.startsWith("http://") || val.startsWith("https://")),
   },
-  {
-    name: "REACT_APP_STRIPE_PUBLISHABLE_KEY",
-    required: true,
-    description: "Stripe publishable API key",
-    validator: (val) => val && (val.startsWith("pk_test_") || val.startsWith("pk_live_")),
-  },
 ];
 
 let allValid = true;
@@ -101,6 +95,7 @@ if (allValid) {
   console.log("📖 See API_KEYS_REQUIRED.md for detailed setup instructions.\n");
   process.exit(1);
 }
+
 
 
 

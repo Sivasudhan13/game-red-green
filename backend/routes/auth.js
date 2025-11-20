@@ -328,15 +328,27 @@ router.post("/register", async (req, res) => {
 
     // Check if email is already used
     if (email) {
-      const existingEmail = await User.findOne({ email: email.toLowerCase() });
+      const normalizedEmail = email.toLowerCase();
+      const existingEmail = await User.findOne({ email: normalizedEmail });
       if (existingEmail) {
         return res
           .status(400)
           .json({ message: "Email already registered" });
       }
+
+      const verifiedEmailOtp = await OTP.findOne({
+        email: normalizedEmail,
+        verified: true,
+      }).sort({ createdAt: -1 });
+
+      if (!verifiedEmailOtp) {
+        return res.status(400).json({
+          message: "Please verify the OTP sent to your email before registering.",
+        });
+      }
     }
 
-    // Note: email OTP verification not required for registration
+    // Email OTP verification is handled above before allowing registration
 
     // Generate unique invite code
     let userInviteCode = generateInviteCode();
@@ -366,6 +378,10 @@ router.post("/register", async (req, res) => {
     });
 
     await user.save();
+
+    if (email) {
+      await OTP.deleteMany({ email: email.toLowerCase() });
+    }
 
     // If referred, add 25rs to referrer
     if (referredBy) {

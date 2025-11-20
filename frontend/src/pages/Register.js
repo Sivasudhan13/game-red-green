@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
@@ -10,8 +10,12 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
-
-  // Email (no OTP required)
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpVerified, setEmailOtpVerified] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+  const [verifyingEmailOtp, setVerifyingEmailOtp] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +25,65 @@ const Register = () => {
   // Format phone number
   const formatPhoneNumber = (value) => value.replace(/\D/g, "").slice(0, 10);
 
-  // No email OTP required for registration
+  useEffect(() => {
+    if (otpCountdown <= 0) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setOtpCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [otpCountdown]);
+
+  useEffect(() => {
+    setEmailOtp("");
+    setEmailOtpSent(false);
+    setEmailOtpVerified(false);
+    setOtpCountdown(0);
+  }, [email]);
+
+  const handleSendEmailOtp = async () => {
+    if (!email || !email.includes("@")) {
+      toast.error("Enter a valid email before requesting OTP");
+      return;
+    }
+
+    setSendingEmailOtp(true);
+    try {
+      await api.post("/auth/send-email-otp", { email: email.toLowerCase() });
+      toast.success("OTP sent to your email");
+      setEmailOtpSent(true);
+      setOtpCountdown(60);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to send email OTP");
+    } finally {
+      setSendingEmailOtp(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp || emailOtp.length !== 6) {
+      toast.error("Enter the 6-digit OTP from your email");
+      return;
+    }
+
+    setVerifyingEmailOtp(true);
+    try {
+      await api.post("/auth/verify-email-otp", {
+        email: email.toLowerCase(),
+        otp: emailOtp,
+      });
+      toast.success("Email verified successfully");
+      setEmailOtpVerified(true);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Invalid OTP");
+      setEmailOtpVerified(false);
+    } finally {
+      setVerifyingEmailOtp(false);
+    }
+  };
 
   // REGISTER
   const handleSubmit = async (e) => {
@@ -37,6 +99,12 @@ const Register = () => {
 
       if (!email.includes("@")) {
         toast.error("Enter valid email");
+        setLoading(false);
+        return;
+      }
+
+      if (!emailOtpVerified) {
+        toast.error("Please verify the OTP sent to your email before registering");
         setLoading(false);
         return;
       }
@@ -71,16 +139,72 @@ const Register = () => {
             />
           </div>
 
-          {/* EMAIL + OTP */}
           <div>
             <label className="block text-sm font-medium mb-1">Email Address</label>
-            <input
-              className="w-full px-4 py-3 border rounded-lg"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@gmail.com"
-            />
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 px-4 py-3 border rounded-lg"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@gmail.com"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendEmailOtp}
+                  disabled={
+                    sendingEmailOtp ||
+                    otpCountdown > 0 ||
+                    !email ||
+                    emailOtpVerified
+                  }
+                  className="px-4 py-3 bg-bet-red text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendingEmailOtp
+                    ? "Sending..."
+                    : emailOtpVerified
+                    ? "Verified"
+                    : otpCountdown > 0
+                    ? `Resend in ${otpCountdown}s`
+                    : "Send OTP"}
+                </button>
+              </div>
+
+              {emailOtpSent && !emailOtpVerified && (
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 px-4 py-3 border rounded-lg tracking-widest text-center uppercase"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={emailOtp}
+                    onChange={(e) =>
+                      setEmailOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    placeholder="Enter 6-digit OTP"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyEmailOtp}
+                    disabled={verifyingEmailOtp}
+                    className="px-4 py-3 bg-green-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {verifyingEmailOtp ? "Verifying..." : "Verify"}
+                  </button>
+                </div>
+              )}
+
+              {emailOtpVerified ? (
+                <p className="text-xs text-green-600">
+                  Email verified via OTP.
+                </p>
+              ) : emailOtpSent ? (
+                <p className="text-xs text-gray-500">
+                  We sent a 6-digit OTP to {email}. Please verify to continue.
+                </p>
+              ) : null}
+            </div>
           </div>
 
           {/* PHONE */}

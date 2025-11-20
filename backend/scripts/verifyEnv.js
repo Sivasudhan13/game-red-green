@@ -20,10 +20,16 @@ const requiredVars = [
     validator: (val) => val && val.length >= 32,
   },
   {
-    name: "STRIPE_SECRET_KEY",
+    name: "RAZORPAY_KEY_ID",
     required: true,
-    description: "Stripe secret API key",
-    validator: (val) => val && (val.startsWith("sk_test_") || val.startsWith("sk_live_")),
+    description: "Razorpay API key ID",
+    validator: (val) => val && val.length >= 10,
+  },
+  {
+    name: "RAZORPAY_KEY_SECRET",
+    required: true,
+    description: "Razorpay API key secret",
+    validator: (val) => val && val.length >= 10,
   },
   {
     name: "PORT",
@@ -89,6 +95,7 @@ if (allValid) {
   console.log("📖 See API_KEYS_REQUIRED.md for detailed setup instructions.\n");
   process.exit(1);
 }
+
 
 
 

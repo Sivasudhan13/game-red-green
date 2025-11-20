@@ -29,6 +29,18 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    razorpayOrderId: {
+      type: String,
+      default: null,
+    },
+    razorpayPaymentId: {
+      type: String,
+      default: null,
+    },
+    razorpaySignature: {
+      type: String,
+      default: null,
+    },
     description: {
       type: String,
       default: "",

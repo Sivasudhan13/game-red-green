@@ -21,8 +21,8 @@ cp .env.example .env
 Required variables:
 - `MONGODB_URI` - MongoDB connection string
 - `JWT_SECRET` - Secret key for JWT tokens
-- `STRIPE_SECRET_KEY` - Stripe API key (for deposits)
-- `RAZORPAY_KEY_ID` & `RAZORPAY_KEY_SECRET` - Razorpay API keys (for real withdrawals)
+- `RAZORPAY_KEY_ID` & `RAZORPAY_KEY_SECRET` - Razorpay API keys (used for deposits & withdrawals)
+- `RAZORPAY_WEBHOOK_SECRET` - Razorpay webhook secret (for payout status callbacks)
 - `EMAIL_USER` & `EMAIL_PASSWORD` - Email credentials for OTP sending
 
 ### 4. Start Backend Server

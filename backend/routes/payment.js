@@ -1,22 +1,27 @@
 const express = require("express");
 const router = express.Router();
+const crypto = require("crypto");
+const Razorpay = require("razorpay");
 const { auth } = require("../middleware/auth");
 const User = require("../models/User");
 const Transaction = require("../models/Transaction");
 const Withdrawal = require("../models/Withdrawal");
 
-// Initialize Stripe only if key is provided
-let stripe = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-}
+const razorpay =
+  process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET
+  ? new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
+  : null;
 
 // Create payment intent for deposit
 router.post("/deposit", auth, async (req, res) => {
   try {
-    if (!stripe) {
+    if (!razorpay) {
       return res.status(500).json({
-        message: "Payment gateway not configured. Please set STRIPE_SECRET_KEY",
+        message:
+          "Payment gateway not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
       });
     }
 
@@ -28,31 +33,45 @@ router.post("/deposit", auth, async (req, res) => {
       });
     }
 
-    // Create payment intent (amount in smallest currency unit - paise for INR)
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convert to paise
-      currency: "inr",
-      metadata: {
+    const orderAmount = Math.round(amount * 100);
+
+    const order = await razorpay.orders.create({
+      amount: orderAmount,
+      currency: "INR",
+      receipt: `dep_${req.user._id}_${Date.now()}`,
+      payment_capture: 1,
+      notes: {
         userId: req.user._id.toString(),
-        type: "deposit",
+        type: "wallet_deposit",
       },
     });
 
-    // Create pending transaction
     const transaction = await Transaction.create({
       user: req.user._id,
       type: "deposit",
       amount,
       status: "pending",
-      stripePaymentIntentId: paymentIntent.id,
+      razorpayOrderId: order.id,
       description: `Deposit of ₹${amount}`,
     });
 
+    const sanitizedPhone =
+      typeof req.user.phoneNumber === "string"
+        ? req.user.phoneNumber.replace(/\D/g, "")
+        : "";
+
     res.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-      amount: amount,
-      currency: "inr",
+      orderId: order.id,
+      amount,
+      amountInPaise: order.amount,
+      currency: order.currency,
+      razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+      transactionId: transaction._id,
+      prefill: {
+        name: req.user.name || "",
+        email: req.user.email || "",
+        phone: sanitizedPhone,
+      },
     });
   } catch (error) {
     console.error("Create deposit error:", error);
@@ -63,32 +82,33 @@ router.post("/deposit", auth, async (req, res) => {
 // Confirm payment and complete deposit
 router.post("/confirm-deposit", auth, async (req, res) => {
   try {
-    if (!stripe) {
+    if (!razorpay) {
       return res.status(500).json({
         message: "Payment gateway not configured",
       });
     }
 
-    const { paymentIntentId } = req.body;
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
 
-    if (!paymentIntentId) {
-      return res.status(400).json({ message: "Payment intent ID required" });
-    }
-
-    // Retrieve payment intent from Stripe
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-    if (paymentIntent.status !== "succeeded") {
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       return res.status(400).json({
-        message: `Payment not completed. Status: ${paymentIntent.status}`,
+        message: "Razorpay order ID, payment ID, and signature are required",
       });
     }
 
-    // Find transaction
+    const generatedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest("hex");
+
+    if (generatedSignature !== razorpaySignature) {
+      return res.status(400).json({ message: "Invalid payment signature" });
+    }
+
     const transaction = await Transaction.findOne({
-      stripePaymentIntentId: paymentIntentId,
       user: req.user._id,
       type: "deposit",
+      razorpayOrderId,
     });
 
     if (!transaction) {
@@ -102,19 +122,19 @@ router.post("/confirm-deposit", auth, async (req, res) => {
       });
     }
 
-    // Update transaction
     transaction.status = "completed";
-    // Store payment method ID (can be string or object)
-    transaction.stripePaymentId =
-      typeof paymentIntent.payment_method === "string"
-        ? paymentIntent.payment_method
-        : paymentIntent.payment_method?.id || paymentIntentId;
+    transaction.razorpayPaymentId = razorpayPaymentId;
+    transaction.razorpaySignature = razorpaySignature;
     await transaction.save();
 
-    // Update user wallet using atomic update to avoid triggering document validation
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { $inc: { walletBalance: transaction.amount, totalDeposits: transaction.amount } },
+      {
+        $inc: {
+          walletBalance: transaction.amount,
+          totalDeposits: transaction.amount,
+        },
+      },
       { new: true }
     );
 

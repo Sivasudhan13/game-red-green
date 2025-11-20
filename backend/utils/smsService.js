@@ -26,16 +26,27 @@ const sendOTPSMS = async (phoneNumber, otp) => {
     }
 
     const hasTwilioConfig =
-      process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER;
+      process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_PHONE_NUMBER;
 
     if (!hasTwilioConfig) {
       // In non-production environments, return mock OTP
       if (process.env.NODE_ENV !== "production") {
-        console.log("⚠️  SMS service not configured. Mock OTP for", normalizedPhone, ":", otp);
-        console.log("💡 To enable real SMS, configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_PHONE_NUMBER in .env");
+        console.log(
+          "⚠️  SMS service not configured. Mock OTP for",
+          normalizedPhone,
+          ":",
+          otp
+        );
+        console.log(
+          "💡 To enable real SMS, configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_PHONE_NUMBER in .env"
+        );
         return { success: true, mock: true, otp };
       }
-      throw new Error("Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER in .env");
+      throw new Error(
+        "Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER in .env"
+      );
     }
 
     // Lazy-require twilio to avoid crash when package not installed
@@ -46,9 +57,12 @@ const sendOTPSMS = async (phoneNumber, otp) => {
       throw new Error("Twilio package not installed. Run: npm install twilio");
     }
 
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    const client = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
 
-    const body = `Your OK.Win verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
+    const body = `Your Win Go verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
 
     const message = await client.messages.create({
       body,

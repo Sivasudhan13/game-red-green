@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import api from '../services/api';
-import { toast } from 'react-toastify';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState } from "react";
+import api from "../services/api";
+import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
 
 const loadRazorpaySdk = () => {
   return new Promise((resolve, reject) => {
@@ -10,21 +10,21 @@ const loadRazorpaySdk = () => {
       return;
     }
 
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+    script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
     document.body.appendChild(script);
   });
 };
 
 const DepositModal = ({ onClose, onSuccess }) => {
   const { user } = useAuth();
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
-  const [sdkError, setSdkError] = useState('');
+  const [sdkError, setSdkError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -38,7 +38,9 @@ const DepositModal = ({ onClose, onSuccess }) => {
       } catch (error) {
         console.error(error);
         if (isMounted) {
-          setSdkError('Unable to load Razorpay SDK. Please refresh and try again.');
+          setSdkError(
+            "Unable to load Razorpay SDK. Please refresh and try again."
+          );
         }
       }
     };
@@ -54,19 +56,21 @@ const DepositModal = ({ onClose, onSuccess }) => {
     const depositAmount = parseFloat(amount);
 
     if (!depositAmount || depositAmount < 70 || depositAmount > 50000) {
-      toast.error('Deposit amount must be between ₹70 and ₹50,000');
+      toast.error("Deposit amount must be between ₹70 and ₹50,000");
       return;
     }
 
     if (!sdkReady || sdkError) {
-      toast.error('Payment gateway is not ready. Please refresh and try again.');
+      toast.error(
+        "Payment gateway is not ready. Please refresh and try again."
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const res = await api.post('/payment/deposit', { amount: depositAmount });
+      const res = await api.post("/payment/deposit", { amount: depositAmount });
       const { data } = res;
       const prefill = data.prefill || {};
 
@@ -74,33 +78,36 @@ const DepositModal = ({ onClose, onSuccess }) => {
         key: data.razorpayKeyId,
         amount: data.amountInPaise,
         currency: data.currency,
-        name: 'OK.Win',
+        name: "Win Go",
         description: `Wallet top-up of ₹${depositAmount}`,
         order_id: data.orderId,
         notes: {
           transactionId: data.transactionId,
         },
         prefill: {
-          name: prefill.name || user?.name || '',
-          email: prefill.email || user?.email || '',
-          contact:
-            (prefill.phone || user?.phoneNumber || '').replace(/\D/g, '').slice(-10),
+          name: prefill.name || user?.name || "",
+          email: prefill.email || user?.email || "",
+          contact: (prefill.phone || user?.phoneNumber || "")
+            .replace(/\D/g, "")
+            .slice(-10),
         },
         theme: {
-          color: '#ef4444',
+          color: "#ef4444",
         },
         handler: async (response) => {
           try {
-            await api.post('/payment/confirm-deposit', {
+            await api.post("/payment/confirm-deposit", {
               razorpayPaymentId: response.razorpay_payment_id,
               razorpayOrderId: response.razorpay_order_id,
               razorpaySignature: response.razorpay_signature,
             });
-            toast.success('Deposit successful!');
+            toast.success("Deposit successful!");
             onSuccess();
             onClose();
           } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to confirm deposit');
+            toast.error(
+              error.response?.data?.message || "Failed to confirm deposit"
+            );
           } finally {
             setLoading(false);
           }
@@ -111,14 +118,16 @@ const DepositModal = ({ onClose, onSuccess }) => {
       };
 
       const razorpayCheckout = new window.Razorpay(razorpayOptions);
-      razorpayCheckout.on('payment.failed', (response) => {
-        toast.error(response.error?.description || 'Payment failed');
+      razorpayCheckout.on("payment.failed", (response) => {
+        toast.error(response.error?.description || "Payment failed");
         setLoading(false);
       });
 
       razorpayCheckout.open();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to initialize payment');
+      toast.error(
+        error.response?.data?.message || "Failed to initialize payment"
+      );
       setLoading(false);
     }
   };
@@ -133,8 +142,18 @@ const DepositModal = ({ onClose, onSuccess }) => {
             className="text-gray-500 hover:text-gray-700"
             disabled={loading}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -157,16 +176,11 @@ const DepositModal = ({ onClose, onSuccess }) => {
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-800 space-y-2">
           <p>
-            <strong>Note:</strong> Payments are processed securely via Razorpay. Use the same email/phone as your account for faster verification.
+            <strong>Note:</strong> Payments are processed securely via Razorpay.
+            Use the same email/phone as your account for faster verification.
           </p>
-          {!sdkReady && !sdkError && (
-            <p>Loading payment gateway...</p>
-          )}
-          {sdkError && (
-            <p className="text-red-600">
-              {sdkError}
-            </p>
-          )}
+          {!sdkReady && !sdkError && <p>Loading payment gateway...</p>}
+          {sdkError && <p className="text-red-600">{sdkError}</p>}
         </div>
 
         <div className="flex gap-3">
@@ -182,7 +196,7 @@ const DepositModal = ({ onClose, onSuccess }) => {
             disabled={!amount || loading || !!sdkError || !sdkReady}
             className="flex-1 py-3 bg-bet-green text-white rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Processing...' : 'Continue to Payment'}
+            {loading ? "Processing..." : "Continue to Payment"}
           </button>
         </div>
       </div>

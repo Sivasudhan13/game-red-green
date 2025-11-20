@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
 
 const Login = () => {
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const formatPhoneNumber = (value) => {
-    const digits = value.replace(/\D/g, '');
+    const digits = value.replace(/\D/g, "");
     return digits.slice(0, 10);
   };
 
@@ -21,31 +21,34 @@ const Login = () => {
 
     try {
       if (!identifier) {
-        toast.error('Please enter your email or phone number');
+        toast.error("Please enter your email or phone number");
         setLoading(false);
         return;
       }
       // if it's a phone number, validate length
-      if (!identifier.includes('@')) {
-        const digits = identifier.replace(/\D/g, '');
+      if (!identifier.includes("@")) {
+        const digits = identifier.replace(/\D/g, "");
         if (digits.length !== 10) {
-          toast.error('Please enter a valid 10-digit phone number');
+          toast.error("Please enter a valid 10-digit phone number");
           setLoading(false);
           return;
         }
       }
       if (!password) {
-        toast.error('Please enter your password');
+        toast.error("Please enter your password");
         setLoading(false);
         return;
       }
       await login(identifier, password);
-      toast.success('Login successful!');
-      navigate('/');
+      toast.success("Login successful!");
+      navigate("/");
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed. Please check your credentials.';
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Login failed. Please check your credentials.";
       toast.error(errorMessage);
-      console.error('Login error:', error);
+      console.error("Login error:", error);
     } finally {
       setLoading(false);
     }
@@ -55,7 +58,7 @@ const Login = () => {
     <div className="min-h-screen bg-gradient-to-br from-bet-red to-red-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-bet-red mb-2">OK.Win</h1>
+          <h1 className="text-3xl font-bold text-bet-red mb-2">Win Go</h1>
           <p className="text-gray-600">Login to your account</p>
         </div>
 
@@ -65,7 +68,9 @@ const Login = () => {
               Email or Phone
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">+91</span>
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                +91
+              </span>
               <input
                 type="text"
                 value={identifier}
@@ -108,14 +113,17 @@ const Login = () => {
             disabled={loading}
             className="w-full bg-bet-red text-white py-3 rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-bet-red font-semibold hover:underline">
+            Don't have an account?{" "}
+            <Link
+              to="/register"
+              className="text-bet-red font-semibold hover:underline"
+            >
               Register here
             </Link>
           </p>
@@ -132,5 +140,3 @@ const Login = () => {
 };
 
 export default Login;
-
-

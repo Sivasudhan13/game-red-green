@@ -1,7 +1,7 @@
 {
   "name": "game-bet-backend",
   "version": "1.0.0",
-  "description": "Backend server for OK.Win betting game",
+  "description": "Backend server for Win Go betting game",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

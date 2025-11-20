@@ -36,7 +36,7 @@ const initiateWithdrawal = async (payoutData) => {
       currency: "INR",
       mode: payoutData.method === "upi" ? "UPI" : "NEFT", // NEFT for bank, UPI for UPI
       purpose: "payout",
-      description: payoutData.description || "Withdrawal from OK.Win",
+      description: payoutData.description || "Withdrawal from Win Go",
       receipt: `withdrawal_${Date.now()}`,
       queue_if_low_balance: true, // Queue if account balance is low
     };

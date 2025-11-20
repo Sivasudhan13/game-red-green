@@ -104,7 +104,9 @@ const Register = () => {
       }
 
       if (!emailOtpVerified) {
-        toast.error("Please verify the OTP sent to your email before registering");
+        toast.error(
+          "Please verify the OTP sent to your email before registering"
+        );
         setLoading(false);
         return;
       }
@@ -123,7 +125,7 @@ const Register = () => {
     <div className="min-h-screen bg-gradient-to-br from-bet-red to-red-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-bet-red mb-2">OK.Win</h1>
+          <h1 className="text-3xl font-bold text-bet-red mb-2">Win Go</h1>
           <p className="text-gray-600">Create your account</p>
         </div>
 
@@ -140,7 +142,9 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Email Address</label>
+            <label className="block text-sm font-medium mb-1">
+              Email Address
+            </label>
             <div className="flex flex-col gap-3">
               <div className="flex gap-2">
                 <input

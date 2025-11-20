@@ -2,7 +2,7 @@
   "name": "game-bet-frontend",
   "version": "0.1.0",
   "private": true,
-  "description": "Frontend React application for OK.Win betting game",
+  "description": "Frontend React application for Win Go betting game",
   "dependencies": {
     "axios": "^1.6.2",
     "react": "^18.2.0",

@@ -139,11 +139,9 @@ router.post("/verify-otp", async (req, res) => {
 
     // Check attempts
     if (otpRecord.attempts >= 5) {
-      return res
-        .status(400)
-        .json({
-          message: "Too many failed attempts. Please request a new OTP.",
-        });
+      return res.status(400).json({
+        message: "Too many failed attempts. Please request a new OTP.",
+      });
     }
 
     // Verify OTP
@@ -177,7 +175,9 @@ router.post("/send-email-otp", async (req, res) => {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Please enter a valid email address" });
+      return res
+        .status(400)
+        .json({ message: "Please enter a valid email address" });
     }
 
     // Check if email is already registered
@@ -224,7 +224,8 @@ router.post("/send-email-otp", async (req, res) => {
       }
 
       res.status(500).json({
-        message: "Failed to send OTP email. Please check your email configuration.",
+        message:
+          "Failed to send OTP email. Please check your email configuration.",
         error: emailError.message,
       });
     }
@@ -240,9 +241,7 @@ router.post("/verify-email-otp", async (req, res) => {
     const { email, otp } = req.body;
 
     if (!email || !otp) {
-      return res
-        .status(400)
-        .json({ message: "Email and OTP are required" });
+      return res.status(400).json({ message: "Email and OTP are required" });
     }
 
     // Find OTP
@@ -264,11 +263,9 @@ router.post("/verify-email-otp", async (req, res) => {
 
     // Check attempts
     if (otpRecord.attempts >= 5) {
-      return res
-        .status(400)
-        .json({
-          message: "Too many failed attempts. Please request a new OTP.",
-        });
+      return res.status(400).json({
+        message: "Too many failed attempts. Please request a new OTP.",
+      });
     }
 
     // Verify OTP
@@ -299,7 +296,9 @@ router.post("/register", async (req, res) => {
     if (!name || !phoneNumber || !password || !email) {
       return res
         .status(400)
-        .json({ message: "Name, phone number, email, and password are required" });
+        .json({
+          message: "Name, phone number, email, and password are required",
+        });
     }
 
     if (password.length < 6) {
@@ -331,24 +330,9 @@ router.post("/register", async (req, res) => {
       const normalizedEmail = email.toLowerCase();
       const existingEmail = await User.findOne({ email: normalizedEmail });
       if (existingEmail) {
-        return res
-          .status(400)
-          .json({ message: "Email already registered" });
-      }
-
-      const verifiedEmailOtp = await OTP.findOne({
-        email: normalizedEmail,
-        verified: true,
-      }).sort({ createdAt: -1 });
-
-      if (!verifiedEmailOtp) {
-        return res.status(400).json({
-          message: "Please verify the OTP sent to your email before registering.",
-        });
+        return res.status(400).json({ message: "Email already registered" });
       }
     }
-
-    // Email OTP verification is handled above before allowing registration
 
     // Generate unique invite code
     let userInviteCode = generateInviteCode();
@@ -378,10 +362,6 @@ router.post("/register", async (req, res) => {
     });
 
     await user.save();
-
-    if (email) {
-      await OTP.deleteMany({ email: email.toLowerCase() });
-    }
 
     // If referred, add 25rs to referrer
     if (referredBy) {
@@ -431,7 +411,7 @@ router.post("/login", async (req, res) => {
     // Allow callers to send either `identifier` (email or phone), or `phoneNumber`/`email` explicitly
     let lookup = {};
     if (identifier) {
-      if (typeof identifier === 'string' && identifier.includes('@')) {
+      if (typeof identifier === "string" && identifier.includes("@")) {
         lookup.email = identifier.toLowerCase();
       } else {
         lookup.phoneNumber = normalizePhoneNumber(identifier);
@@ -443,7 +423,11 @@ router.post("/login", async (req, res) => {
     }
 
     if ((!lookup.email && !lookup.phoneNumber) || !password) {
-      return res.status(400).json({ message: "Identifier (email or phone) and password are required" });
+      return res
+        .status(400)
+        .json({
+          message: "Identifier (email or phone) and password are required",
+        });
     }
 
     // Find user by email or phone

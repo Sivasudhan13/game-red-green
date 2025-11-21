@@ -30,27 +30,26 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = async (identifier, password) => {
-    // If identifier looks like email, send as email
-    if (identifier && identifier.includes && identifier.includes('@')) {
-      const res = await api.post('/auth/login', { identifier: identifier.toLowerCase(), password });
+  const login = async (phoneNumber, password) => {
+    // Normalize phone number (remove spaces, ensure proper format)
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    if (normalizedPhone.length === 10) {
+      const formattedPhone = '+91' + normalizedPhone;
+      const res = await api.post('/auth/login', { phoneNumber: formattedPhone, password });
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
       setUser(res.data.user);
       return res.data;
     }
-
-    // Otherwise treat as phone number
-    const normalizedPhone = (identifier || '').replace(/\D/g, '');
-    const formattedPhone = normalizedPhone.length === 10 ? '+91' + normalizedPhone : identifier;
-    const res = await api.post('/auth/login', { identifier: formattedPhone, password });
+    // If already has +91, use as is
+    const res = await api.post('/auth/login', { phoneNumber, password });
     localStorage.setItem('token', res.data.token);
     localStorage.setItem('user', JSON.stringify(res.data.user));
     setUser(res.data.user);
     return res.data;
   };
 
-  const register = async (name, phoneNumber, password, inviteCode, email) => {
+  const register = async (name, phoneNumber, password, inviteCode) => {
     // Normalize phone number
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
     const formattedPhone = normalizedPhone.length === 10 ? '+91' + normalizedPhone : phoneNumber;
@@ -58,8 +57,7 @@ export const AuthProvider = ({ children }) => {
       name: name.trim(), 
       phoneNumber: formattedPhone, 
       password, 
-      inviteCode: inviteCode ? inviteCode.toUpperCase().trim() : undefined,
-      email: email ? email.toLowerCase() : undefined
+      inviteCode: inviteCode ? inviteCode.toUpperCase().trim() : undefined
     });
     localStorage.setItem('token', res.data.token);
     localStorage.setItem('user', JSON.stringify(res.data.user));
